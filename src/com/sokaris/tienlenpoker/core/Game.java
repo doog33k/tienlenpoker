@@ -1,5 +1,6 @@
 package com.sokaris.tienlenpoker.core;
 
+import java.util.Iterator;
 import java.util.Random;
 import java.util.SortedMap;
 import java.util.TreeMap;
@@ -11,6 +12,8 @@ public class Game {
 
     public static final int MAX_CARDS = 52;
     public static final int MAX_PLAYERS = 4;
+    public static final long MASK_PLAYERS_POSITION = 0xF00000000000000L;
+    public static final long MASK_PLAYERS_ROUND = 0xF0000000000000L;
 
     private final Player[] players;
 
@@ -57,7 +60,7 @@ public class Game {
      */
     public Game newRound(final int playerIndex)
     {
-        round = (15L << MAX_CARDS) ^ (1L << (playerIndex + MAX_PLAYERS + MAX_CARDS));
+        round = MASK_PLAYERS_ROUND | (1L << (playerIndex + MAX_PLAYERS + MAX_CARDS));
         return this;
     }
 
@@ -68,7 +71,7 @@ public class Game {
      */
     public Player currentPlayer()
     {
-        long currentPlayer = (round >> (MAX_CARDS + MAX_PLAYERS)) & 15L;
+        long currentPlayer = (round >> (MAX_CARDS + MAX_PLAYERS)) & 0xF;
 
         int index = 0;
         while (currentPlayer != 1L) {
@@ -86,8 +89,8 @@ public class Game {
      */
     public Player nextPlayer()
     {
-        long currentPlayer = (round >> (MAX_CARDS + MAX_PLAYERS)) & 15L;
-        long playersInRound = (round >> MAX_CARDS) & 15L;
+        long currentPlayer = (round >> (MAX_CARDS + MAX_PLAYERS)) & 0xF;
+        long playersInRound = (round >> MAX_CARDS) & 0xF;
 
         long nextPlayer = (currentPlayer == 8L) ? 1L : currentPlayer << 1;
         while ((nextPlayer & playersInRound) == 0L && nextPlayer != currentPlayer) {
@@ -124,10 +127,9 @@ public class Game {
         }
 
         // dispatching cards
-        for (Integer integer : cardsRandomized.values()) {
-            for (int i = 0; i < MAX_PLAYERS; i++) {
-                players[i].deck |= 1L << integer;
-            }
+        Iterator<Integer> card = cardsRandomized.values().iterator();
+        for (int i = 0; i < MAX_CARDS; i++) {
+            players[i%4].deck |= 1L << card.next();
         }
 
         return this;
@@ -142,7 +144,7 @@ public class Game {
     public Game updateRound(long card)
     {
         // erasing previous card and keeping players in round and player round order
-        round &= 255L << MAX_CARDS;
+        round &= MASK_PLAYERS_ROUND | MASK_PLAYERS_POSITION;
         // replace the card in the round
         round ^= card;
         return this;
@@ -182,6 +184,6 @@ public class Game {
      */
     public boolean shouldPlay(long card)
     {
-        return card > round;
+        return true;
     }
 }
